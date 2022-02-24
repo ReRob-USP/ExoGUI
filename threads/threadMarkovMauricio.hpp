@@ -21,8 +21,6 @@
 
 #include <utils_control.hpp>
 
-
-
 typedef union{
     struct{
         float Fx;
@@ -83,7 +81,6 @@ class ThreadMarkovMao1: public ThreadType{
 
                 }
 
-                 
                 void calculate_rlqr(){
                     _atomic_trheadaux = true;
                     using namespace rlqr;
@@ -304,6 +301,7 @@ class ThreadMarkovMao1: public ThreadType{
 
                 void calculate_torque_d(){
                     torque_d = Kv * (theta_ld - theta_l) + Bv * (omega_ld - omega_l);
+
                     torque_r[0] = ks * (theta_c - theta_l);
                     erro_0 = (torque_d - torque_r[0]);
                 }
@@ -338,7 +336,7 @@ class ThreadMarkovMao1: public ThreadType{
                     u =  K.t() * X;
 
                     omega_m = arma::as_scalar(u);
-                    omega_l = arma::as_scalar((u(0, 0) / N) - (dot_torque[0] / ks));
+                    omega_l = ((omega_m / N) - (dot_torque[0] / ks));
                 }
 
                 void prepareNewLoop(){
@@ -377,13 +375,12 @@ class ThreadMarkovMao1: public ThreadType{
         
         std::string LOG;
         
-
         ThreadMarkovMao1(){
+
             knee_r = new Joint_EXO();
             knee_r->dir__ = "Mat2Exo/out/";
             knee_r->axis_m_ptr = &((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->servo_knee_right;
             knee_r->axis_l_ptr = &((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->encoder_knee_right;
-     
         }
 
       
@@ -453,10 +450,10 @@ class ThreadMarkovMao1: public ThreadType{
 
             knee_r->calculate_torque_d();
 
-            knee_r->prepareMarkovStates();
+            //knee_r->prepareMarkovStates();
             
 
-            //knee_r->calculate_PID_signal_controle();
+            knee_r->calculate_PID_signal_controle();
 
             
 
@@ -477,7 +474,6 @@ class ThreadMarkovMao1: public ThreadType{
             knee_r->prepareNewLoop();
 
             _mtx.lock();   
-
                 _datalog[time_index][0] = timer->get_delta_time();
                 _datalog[time_index][1] = timer->get_current_time_f();
                 _datalog[time_index][2] = (float) knee_r->X(0, 0);
