@@ -7,4 +7,5 @@ data = load('../datos/last_data_XSens Leo 1.dat');
 t = data(:,1);
 
 
-plot(t,data(:,2:end))
+plot(t,data(:,2))
+

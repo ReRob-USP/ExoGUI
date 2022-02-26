@@ -12,10 +12,9 @@ Tx = data(:,5);
 Ty = data(:,6);
 Tz = data(:,7);
 
-fig = figure(1);
+
 % fig.GraphicsSmoothing = 'off';
 
-ax = axes(fig);
 
 hold on
 
@@ -26,11 +25,10 @@ plot(t,Tx)
 plot(t,Ty)
 plot(t,Tz)
 
-legend("Fx","Fy","Fz","Tx","Ty","Tz")
 
 hold off
-xlabel("Time [ s ] ")
-ylabel("Amplitude [ u ]")
-title("Axia80M50 Sensor Data")
+xlabel('Time [ s ] ')
+ylabel('Amplitude [ u ]')
+title('Axia80M50 Sensor Data')
 grid on
 grid minor

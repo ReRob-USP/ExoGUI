@@ -75,6 +75,11 @@ class ThreadXsensLeo: public ThreadType{
 
 
         void _setup(){
+
+            ((ThreadXsensRead*)XsensRead->threadType_)->sensorsSxens[0].required = true;
+            ((ThreadXsensRead*)XsensRead->threadType_)->sensorsSxens[1].required = true;
+            ((ThreadXsensRead*)XsensRead->threadType_)->sensorsSxens[2].required = true;
+            ((ThreadXsensRead*)XsensRead->threadType_)->sensorsSxens[3].required = true;
             
             using namespace std;
             using namespace Eigen;
@@ -294,7 +299,7 @@ class ThreadXsensLeo: public ThreadType{
             if (plotting) {
                 {
                     std::unique_lock<std::mutex> _(_mtx);
-                    pw.show();
+                    pw.showNewWindow();
                 }
             }
 

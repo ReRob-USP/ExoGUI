@@ -6,7 +6,7 @@ class PlotWindow {
 public: 
 	std::vector<ImGui::PlotItem> items;
 	ImGui::PlotInterface SCOPE;
-
+	std::string winName;
 	PlotWindow(){}
 
 	PlotWindow(std::string xlabel, std::string ylabel, std::string namePlot) {
@@ -17,6 +17,7 @@ public:
 		SCOPE.x_axis.label = xlabel;
 		SCOPE.y_axis.label = ylabel;
 		SCOPE.title = namePlot;
+		winName = "";
 	}
 
 	void clearItems() {
@@ -36,5 +37,10 @@ public:
 
 	void show() {
 		ImGui::Plot("SCOPE", SCOPE, items);
+	}
+	void showNewWindow() {
+		ImGui::Begin(SCOPE.title.c_str());
+			ImGui::Plot("SCOPE", SCOPE, items);
+		ImGui::End();
 	}
 };

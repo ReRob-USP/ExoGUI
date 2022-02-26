@@ -2,7 +2,9 @@ clc
 close all
 clear all
 
+
 files = {'incertezas' , 'model' , 'control_parameters' };
+files = {'incertezas_cdc' , 'model_cdc' , 'control_parameters_cdc','loop_externo_cdc' };
 for idx = 1:numel(files)
    load([files{idx} '.mat']) ;
 end

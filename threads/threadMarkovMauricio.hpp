@@ -44,15 +44,18 @@ class ThreadMarkovMao1: public ThreadType{
 
         class Joint_EXO {
             public:
-                double Kv,Bv,torque_d,theta_c,theta_l,omega_l,omega_m,theta_m,
-                       omega_ld,theta_ld,dot_torque[2],torque_r[7],error_theta[3],error_omega[3],
-                       int_torque_error[2],error_torque[3],kp ,ki ,kd ,encoder_in_Q,encoder_out_Q,
-                       N,ks,erro_0,erro_1,erro_2,u_ant,Ts;
+                double Kv, Bv, torque_d, theta_c, theta_l, omega_l, omega_m, theta_m,
+                    omega_ld, theta_ld, dot_torque[2] = { 0 }, torque_r[7] = { 0 }, error_theta[3] = { 0 }, error_omega[3] = { 0 }, error_theta_l[4] = { 0 },
+                    int_torque_error[2] = { 0 }, error_torque[3] = { 0 }, kp, ki, kd, encoder_in_Q, encoder_out_Q,
+                    N, ks, erro_0, erro_1, erro_2, u_ant, Ts, _theta_l[4] = { 0 };
                 double ZERO_M, ZERO_L;
+                double _omega_l[4] = { 0 }, d_omega_l = 0;
+                double _torque_i[4] = { 0 }, d_torque_i = 0;
 
                 int VEL_MAX;
                 arma::mat X,u,K;
-                arma::mat K1 ,  K2 , K3 , K4 , K5;
+                arma::mat K1,  K2 , K3 , K4 , K5;
+                arma::mat Br, Jr, Kh;
                 std::string dir__;
                 std::atomic<bool> _atomic_trheadaux;
                 std::thread _threadAux;
@@ -78,6 +81,21 @@ class ThreadMarkovMao1: public ThreadType{
                     K4.clear();
                     K5.clear();
                     return false;
+
+                }
+
+                bool loadLoopExterno() {
+                    if (Br.load((dir__ + "Br.dat").c_str()))
+                    if (Jr.load((dir__ + "Jr.dat").c_str()))
+                    if (Kh.load((dir__ + "Kh.dat").c_str()))
+                    return true;
+
+                    Br.clear();
+                    Jr.clear();
+                    Kh.clear();
+
+                    return false;
+
 
                 }
 
@@ -263,10 +281,15 @@ class ThreadMarkovMao1: public ThreadType{
 
                 void reset(){
                     Kv = 0;Bv = 0;torque_d = 0;theta_c = 0;theta_l = 0;omega_l = 0;theta_m = 0;omega_ld = 0;theta_ld = 0;
-                    dot_torque[2] = {0};torque_r[7] = {0};dot_torque[2] = {0};torque_r[7] = {0};error_theta[3] = {0};
-                    error_omega[3] = {0};int_torque_error[2] = {0};error_torque[3] = {0};kp  = 0;ki  = 0;kd  = 0;encoder_in_Q = 0;
-                    encoder_out_Q = 0;N = 0;ks = 0;erro_0=0,erro_1 = 0,erro_2 = 0;u_ant = 0;Ts = 0;omega_m = 0;
-                    VEL_MAX = 500;
+                    dot_torque[0] = { 0 }; torque_r[0] = { 0 }; dot_torque[2] = { 0 }; torque_r[0] = { 0 }; error_theta[0] = { 0 }; _theta_l[0] = { 0 };
+                    error_omega[0] = {0};int_torque_error[0] = {0};error_torque[3] = {0};kp  = 0;ki  = 0;kd  = 0;encoder_in_Q = 0;
+                    encoder_out_Q = 0; N = 0; ks = 0; erro_0 = 0, erro_1 = 0, erro_2 = 0; u_ant = 0; Ts = 0; omega_m = 0; error_theta_l[0] = 0;
+                    VEL_MAX = 500; 
+
+                    /*
+                        Falta resetear Vectores
+                    */
+
                     u.zeros(1,1);
                     X.zeros(1,1);
                 }
@@ -297,6 +320,7 @@ class ThreadMarkovMao1: public ThreadType{
                 void setPosEncoder_l(long raw_angle){
                     raw_angle -= ZERO_L;
                     theta_l = ( - raw_angle * 2.0 * arma::datum::pi) / (encoder_out_Q );
+                    _theta_l[0] = theta_l;
                 }
 
                 void calculate_torque_d(){
@@ -308,7 +332,7 @@ class ThreadMarkovMao1: public ThreadType{
 
                 void prepareMarkovStates() {
 
-                    torque_r[0] = torque_r[0];
+                    torque_r[0] = ks * (theta_c - theta_l);
                     error_theta[0] = theta_ld - theta_l;
                     error_omega[0] = omega_ld - omega_l;
                     error_torque[0] = torque_d - torque_r[0];
@@ -326,6 +350,10 @@ class ThreadMarkovMao1: public ThreadType{
                     u(0,0) = omega_m;
                 }
 
+                void calculate_torque_d_loop_externo(int gait_phase) {
+                    torque_d = -Kv*X(2,0) -Bv*d_torque_i; (Kh(0, gait_phase - 1) * X(5, 0) + Jr(0, 0) * d_omega_l);
+                }
+
                 void calculate_Markov_signal_controle(int gait_phase){
                     if(gait_phase == 1) { K = K1; }
                     else if(gait_phase == 2) {K = K2; }
@@ -336,7 +364,7 @@ class ThreadMarkovMao1: public ThreadType{
                     u =  K.t() * X;
 
                     omega_m = arma::as_scalar(u);
-                    omega_l = ((omega_m / N) - (dot_torque[0] / ks));
+                    omega_l = (_theta_l[0] - _theta_l[2])/(2*Ts); // ((omega_m / N) - (dot_torque[0] / ks));
                 }
 
                 void prepareNewLoop(){
@@ -350,10 +378,34 @@ class ThreadMarkovMao1: public ThreadType{
                     torque_r[2] = torque_r[1];
                     torque_r[1] = torque_r[0];
 
+                    error_theta_l[3] = error_theta_l[2];
+                    error_theta_l[2] = error_theta_l[1];
+                    error_theta_l[0] = error_theta_l[0];
+
+                    _theta_l[3] = _theta_l[2];
+                    _theta_l[2] = _theta_l[1];
+                    _theta_l[1] = _theta_l[0];
+
+
                     error_theta[2] = error_theta[1];
                     error_theta[1] = error_theta[0];
                     dot_torque[1] = dot_torque[0];
                     int_torque_error[1] = int_torque_error[0];
+
+                    _omega_l[0] = omega_l;
+                     d_omega_l = (_omega_l[0] - _omega_l[2]) / (2.0 * Ts);
+
+                    _omega_l[3] = _omega_l[2];
+                    _omega_l[2] = _omega_l[1];
+                    _omega_l[1] = _omega_l[0];
+
+                    _torque_i[0] = X(2, 0);
+                    d_torque_i = (_torque_i[0] - _torque_i[2]) / (2.0 * Ts);
+
+                    _torque_i[3] = _torque_i[2];
+                    _torque_i[2] = _torque_i[1];
+                    _torque_i[1] = _torque_i[0];
+                    
                 }
 
                 void setVelocity() {
@@ -369,10 +421,11 @@ class ThreadMarkovMao1: public ThreadType{
 
     public:       
         
+        std::atomic<bool> showGraph;
         
-        bool showGraph = false;
-  
-        
+        std::vector<PlotWindow> pw;
+
+
         std::string LOG;
         
         ThreadMarkovMao1(){
@@ -381,6 +434,21 @@ class ThreadMarkovMao1: public ThreadType{
             knee_r->dir__ = "Mat2Exo/out/";
             knee_r->axis_m_ptr = &((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->servo_knee_right;
             knee_r->axis_l_ptr = &((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->encoder_knee_right;
+
+            pw.push_back(PlotWindow("Units [ Nm/s ]", "Time [ s ]", "State 1"));
+            pw.push_back(PlotWindow("Units [ Nm ]", "Time [ s ]", "State 2"));
+            pw.push_back(PlotWindow("Units [ Nm ]", "Time [ s ]", "State 3"));
+            pw.push_back(PlotWindow("Units [ rad/s ]", "Time [ s ]", "State 4"));
+            pw.push_back(PlotWindow("Units [ rad ]", "Time [ s ]", "State 5"));
+            pw.push_back(PlotWindow("Units [ rad/s ]", "Time [ s ]", "State 6"));
+            pw.push_back(PlotWindow("Units [ rad ]", "Time [ s ]", "State 7"));
+            pw.push_back(PlotWindow("Units [ int(Nm) ]", "Time [ s ]", "State 8"));
+            pw.push_back(PlotWindow("Units [ rad/s ]", "Time [ s ]", "Signal Control"));
+
+            
+            
+
+            showGraph = false;
         }
 
       
@@ -405,9 +473,10 @@ class ThreadMarkovMao1: public ThreadType{
   
 
             knee_r->dir__ = "Mat2Exo/out/";
-            knee_r->loadKs();
+            if(!knee_r->loadKs()) throw "Error en las Ks";
+            if(!knee_r->loadLoopExterno()) throw "Error en lectura loop externo";
             knee_r->reset();
-            knee_r->Kv = 0;
+            knee_r->Kv = 1;
             knee_r->Bv = 0;
             knee_r->kp = 380;
             knee_r->ki = 35;
@@ -426,7 +495,39 @@ class ThreadMarkovMao1: public ThreadType{
             ((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->setVelocityMode(knee_r->axis_m_ptr);
             ((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->Habilita_Eixo(2);*/
             
-            
+            for (int idx = 0; idx < pw.size(); idx++) {
+                pw[idx].SCOPE.x_axis.minimum = 0.0f;
+                pw[idx].SCOPE.x_axis.maximum = T_exec;
+                pw[idx].clearItems();
+                pw[idx].addItem("...");
+            }
+
+            pw[0].SCOPE.y_axis.minimum = -200.0f;
+            pw[0].SCOPE.y_axis.maximum =  200.0f;
+
+            pw[1].SCOPE.y_axis.minimum = -10.0f;
+            pw[1].SCOPE.y_axis.maximum =  10.0f;
+
+            pw[2].SCOPE.y_axis.minimum = -10.0f;
+            pw[2].SCOPE.y_axis.maximum =  10.0f;
+
+            pw[3].SCOPE.y_axis.minimum = -1.0f;
+            pw[3].SCOPE.y_axis.maximum =  1.0f;
+
+            pw[4].SCOPE.y_axis.minimum = -.80f;
+            pw[4].SCOPE.y_axis.maximum =  .80f;
+
+            pw[5].SCOPE.y_axis.minimum = -1.0f;
+            pw[5].SCOPE.y_axis.maximum =  1.0f;
+
+            pw[6].SCOPE.y_axis.minimum = -.80f;
+            pw[6].SCOPE.y_axis.maximum =  .80f;
+
+            pw[7].SCOPE.y_axis.minimum = -1.0f;
+            pw[7].SCOPE.y_axis.maximum =  1.0f;
+
+            pw[8].SCOPE.y_axis.minimum = -2000.0f;
+            pw[8].SCOPE.y_axis.maximum =  2000.0f;
         }
 
         void _cleanup(){
@@ -448,18 +549,20 @@ class ThreadMarkovMao1: public ThreadType{
 
             knee_r->updatePosEncoder();
 
-            knee_r->calculate_torque_d();
+            //knee_r->calculate_torque_d();
+            knee_r->calculate_torque_d_loop_externo(gait_phase);
 
-            //knee_r->prepareMarkovStates();
+
+            knee_r->prepareMarkovStates();
             
 
-            knee_r->calculate_PID_signal_controle();
+            //knee_r->calculate_PID_signal_controle();
 
             
 
             knee_r->X(0,0) = knee_r->dot_torque[0]; 
             knee_r->X(1,0) = knee_r->torque_r[0]; 
-            knee_r->X(2,0) = -dataATI.Fx*.25;
+            knee_r->X(2,0) = -dataATI.Fx * .25;
             knee_r->X(3,0) = knee_r->omega_l; 
             knee_r->X(4,0) = knee_r->theta_l; 
             knee_r->X(5,0) = dataXsensLeo.data[3];
@@ -487,12 +590,17 @@ class ThreadMarkovMao1: public ThreadType{
                 _datalog[time_index][10] = arma::as_scalar(knee_r->u);
                 _datalog[time_index][11] = knee_r->torque_d;
                 _datalog[time_index][12] = knee_r->theta_ld;
+                _datalog[time_index][13] = knee_r->d_omega_l;
+
+                for (int idx = 0; idx < pw.size(); idx++) {
+                    pw[idx].items[0].data.push_back(ImVec2((float)_datalog[time_index][1], (float)_datalog[time_index][2+idx]));
+                }
 
             _mtx.unlock();
         }
 
         
-        
+        bool cbPlot = false;
         void _updateGUI(){
             ImGui::Begin(_name.c_str());
                 if(isAlive)
@@ -526,8 +634,12 @@ class ThreadMarkovMao1: public ThreadType{
                     LOG = "";
                 }
 
-                if (ImGui::Button("Get Pos KR")) {
-                    printf("\n %f \t %f", knee_r->theta_m, knee_r->theta_l);
+                ImGui::Checkbox("Graph", &cbPlot);
+                showGraph = cbPlot;
+                if (showGraph) {
+                    for (int idx = 0; idx < pw.size(); idx++) {
+                        pw[idx].showNewWindow();
+                    }
                 }
 
                 ImGui::Text(LOG.c_str());

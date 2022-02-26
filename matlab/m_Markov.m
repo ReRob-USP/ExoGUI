@@ -14,3 +14,8 @@ for s = 1:8
 end
 figure(2)
 plot(t,data(:,11))
+%%
+figure(3)
+hold on
+plot(t,data(:,12))
+plot(t,data(:,2+2))
