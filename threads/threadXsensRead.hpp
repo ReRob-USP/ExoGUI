@@ -67,13 +67,14 @@ class ThreadXsensRead: public ThreadType{
         int desiredIMUs = 0;
         
         LowPassFilter2pFloat imu_filters[4*6];
+        float imus_vals[4 * 6];
         std::vector<MtwCallback *> mtwCallbacks; 
         std::vector<XsEuler>  eulerData;
         std::vector<XsVector> accData;
         std::vector<XsVector> gyroData;
         std::vector<XsVector> magData;
 
-        const int desiredUpdateRate = 100;
+        const int desiredUpdateRate = 75;
         const int desiredRadioChannel = 25;
 
         void _setup(){
@@ -81,7 +82,7 @@ class ThreadXsensRead: public ThreadType{
             using namespace std;
             vector<int> imu_headers(4);
             
-            
+            for (int i = 0; i < 24; i++) imus_vals[i] = 0;
 
             mtwCallbacks.clear();
 
@@ -344,62 +345,74 @@ class ThreadXsensRead: public ThreadType{
         }
 
         void _loop(){
-            
-        
-            bool newDataAvailable = false;
 
-            for (size_t i = 0; i < mtwCallbacks.size(); ++i){
+            for (size_t i = 0; i < (int)mtwCallbacks.size(); ++i)
+            {
+                bool newDataAvailable = false;
                 if (mtwCallbacks[i] == NULL) continue;
-                if (mtwCallbacks[i]->dataAvailable()){
+
+                if (mtwCallbacks[i]->dataAvailable())
+                {
                     newDataAvailable = true;
-                    XsDataPacket const *packet = mtwCallbacks[i]->getOldestPacket();
+                    XsDataPacket packet = mtwCallbacks[i]->fetchOldestPacket();
+                    if (packet.containsCalibratedGyroscopeData())
+                        gyroData[i] = packet.calibratedGyroscopeData();
 
-                    eulerData[i] = packet->orientationEuler();
-                    accData[i]   = packet->calibratedAcceleration();
-                    gyroData[i]  = packet->calibratedGyroscopeData();
-                    magData[i]   = packet->calibratedMagneticField();
-
-                    mtwCallbacks[i]->deleteOldestPacket();
-
-                    {
-                        std::unique_lock<std::mutex> _(_mtx);
-
-                        if (i == 0 || i == 1){
-                            data.imus_data[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
-                            data.imus_data[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
-                            data.imus_data[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
-                            data.imus_data[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
-                            data.imus_data[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
-                            data.imus_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
-                        }
-                        if (i == 2){
-                            data.imus_data[6*i+0] = imu_filters[6*i+0].apply( gyroData[i].value(2) );
-                            data.imus_data[6*i+1] = imu_filters[6*i+1].apply(-gyroData[i].value(1) );
-                            data.imus_data[6*i+2] = imu_filters[6*i+2].apply( gyroData[i].value(0) );
-                            data.imus_data[6*i+3] = imu_filters[6*i+3].apply(  accData[i].value(2) );
-                            data.imus_data[6*i+4] = imu_filters[6*i+4].apply( -accData[i].value(1) );
-                            data.imus_data[6*i+5] = imu_filters[6*i+5].apply(  accData[i].value(0) );
-                        }
-                        else {
-                            data.imus_data[6 * i + 0] = imu_filters[6 * i + 0].apply(gyroData[i].value(2));
-                            data.imus_data[6 * i + 1] = imu_filters[6 * i + 1].apply(-gyroData[i].value(1));
-                            data.imus_data[6 * i + 2] = imu_filters[6 * i + 2].apply(gyroData[i].value(0));
-                            data.imus_data[6 * i + 3] = imu_filters[6 * i + 3].apply(accData[i].value(2));
-                            data.imus_data[6 * i + 4] = imu_filters[6 * i + 4].apply(-accData[i].value(1));
-                            data.imus_data[6 * i + 5] = imu_filters[6 * i + 5].apply(accData[i].value(0));
-                        }
-                        // std::unique_lock<std::mutex> _(_mtx);
-                        // memcpy(imu_shared_data, imus_data, sizeof(imus_data));
-                        _datalog[time_index][0] = timer->get_current_time_f();
-                        for(int idx  = 0 ; idx < N_IMU*6; idx++){
-                            _datalog[time_index][idx +1] = data.imus_data[idx];
-                        }
-                        
-                        
-                    }
-
-
+                    if (packet.containsCalibratedAcceleration())
+                        accData[i] = packet.calibratedAcceleration();
                 }
+
+                if (newDataAvailable) {
+                    // Orientacao Perna DIR: [-3 2 1]
+                    // Orientacao Perna ESQ: [3 -2 1]
+                    // Orientacao Pe DIR:    [2 -1 3]
+                    // Avoid gyroData[i][k] or gyroData[i].at(k) or gyroData[i].value(k)
+                    // due to the 'assert' inside these operators on xsvector.h !!!
+                    std::vector<XsReal> gyroVector = gyroData[i].toVector();
+                    std::vector<XsReal> accVector = accData[i].toVector();
+                    if (i == 0) { // Coxa
+                        imus_vals[0] = imu_filters[0].apply(-gyroVector[2]);
+                        imus_vals[1] = imu_filters[1].apply(gyroVector[1]);
+                        imus_vals[2] = imu_filters[2].apply(gyroVector[0]);
+                        imus_vals[3] = imu_filters[3].apply(-accVector[2]);
+                        imus_vals[4] = imu_filters[4].apply(accVector[1]);
+                        imus_vals[5] = imu_filters[5].apply(accVector[0]);
+
+                    }
+                    if (i == 1) { // Canela
+                        imus_vals[6] = imu_filters[6].apply(-gyroVector[2]);
+                        imus_vals[7] = imu_filters[7].apply(gyroVector[1]);
+                        imus_vals[8] = imu_filters[8].apply(gyroVector[0]);
+                        imus_vals[9] = imu_filters[9].apply(-accVector[2]);
+                        imus_vals[10] = imu_filters[10].apply(accVector[1]);
+                        imus_vals[11] = imu_filters[11].apply(accVector[0]);
+
+                    }
+                    if (i == 2) { // Pe
+                        imus_vals[12] = imu_filters[12].apply( gyroVector[1]);
+                        imus_vals[13] = imu_filters[13].apply(-gyroVector[0]);
+                        imus_vals[14] = imu_filters[14].apply( gyroVector[2]);
+                        imus_vals[15] = imu_filters[15].apply( accVector[1] );
+                        imus_vals[16] = imu_filters[16].apply(-accVector[0] );
+                        imus_vals[17] = imu_filters[17].apply( accVector[2] );
+
+                    }
+                    if (i == 3) { // Canela Exo
+                        imus_vals[18] = imu_filters[18].apply(gyroVector[2]);
+                        imus_vals[19] = imu_filters[19].apply(-gyroVector[1]);
+                        imus_vals[20] = imu_filters[20].apply(gyroVector[0]);
+                        imus_vals[21] = imu_filters[21].apply(accVector[2]);
+                        imus_vals[22] = imu_filters[22].apply(-accVector[1]);
+                        imus_vals[23] = imu_filters[23].apply(accVector[0]);
+
+                    }
+                    std::unique_lock<std::mutex> _(_mtx);
+                    memcpy(data.imus_data, imus_vals, (24 * sizeof(float)));
+                }
+            }
+
+            for (int idx = 0; idx < N_IMU * 6; idx++) {
+                _datalog[time_index][idx + 1] = data.imus_data[idx];
             }
 
             if (true) {
@@ -423,9 +436,6 @@ class ThreadXsensRead: public ThreadType{
                 }                
             }
 
-
-            //_mtx.lock();    
-            //_mtx.unlock();
         }
 
         bool cbPlot = false;
