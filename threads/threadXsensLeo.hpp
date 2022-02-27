@@ -150,6 +150,10 @@ public:
 		}
 	}
 
+	void _firstLoop() {
+
+	}
+
 	void _cleanup() {
 
 	}
@@ -325,7 +329,7 @@ public:
 
 
 		// Remove arbitrary IMU attitude:
-		if (float(offCount*_Ts) < 2 ) // 2 segundos
+		if (float(offCount * _Ts) < 2) // 2 segundos
 		{
 			q12Off.w() += (_Ts / 1) * qDelta(qASGD2_qk, qASGD1_qk)(0);
 			q12Off.x() += (_Ts / 1) * qDelta(qASGD2_qk, qASGD1_qk)(1);
@@ -375,16 +379,32 @@ public:
 		omega_k[2] = omega_k[1];
 		omega_k[1] = omega_k[0];
 
-		states_data[0] = knee_euler(0);  // knee_pos
-		states_data[1] = knee_omega(1);  // knee_vel
-		states_data[2] = knee_acc_omega; // knee_acc
-		states_data[3] = -ankle_euler(0); // ankle_pos
-		states_data[4] = -ankle_omega(0); // ankle_vel
-		states_data[5] = 0;				 // ankle_acc
-		states_data[6] = 0;				 // Exo pos
-		states_data[7] = gyro4(0);		 // Exo vel
-		states_data[8] = 0;				 // Exo acc
-		states_data[9] = 0;
+		if (float(offCount * _Ts) < 2) // 2 segundos
+		{
+			states_data[0] = 0;
+			states_data[1] = 0;
+			states_data[2] = 0;
+			states_data[3] = 0;
+			states_data[4] = 0;
+			states_data[5] = 0;
+			states_data[6] = 0;
+			states_data[7] = 0;
+			states_data[8] = 0;
+			states_data[9] = 0;
+
+		}
+		else {
+			states_data[0] = knee_euler(0);  // knee_pos
+			states_data[1] = knee_omega(1);  // knee_vel
+			states_data[2] = knee_acc_omega; // knee_acc
+			states_data[3] = -ankle_euler(0); // ankle_pos
+			states_data[4] = -ankle_omega(0); // ankle_vel
+			states_data[5] = 0;				 // ankle_acc
+			states_data[6] = 0;				 // Exo pos
+			states_data[7] = gyro4(0);		 // Exo vel
+			states_data[8] = 0;				 // Exo acc
+			states_data[9] = 0;
+		}
 
 		{ // sessao critica
 			unique_lock<mutex> _(_mtx);

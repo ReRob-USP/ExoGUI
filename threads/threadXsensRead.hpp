@@ -287,11 +287,7 @@ class ThreadXsensRead: public ThreadType{
         void _firstLoop() {
             using namespace std;
 
-            if (!wirelessMasterDevice->gotoMeasurement()) {
-                ostringstream error;
-                error << "Failed to goto measurement mode: " << *wirelessMasterDevice;
-                throw runtime_error(error.str());
-            }
+            
 
            /* XsDeviceIdArray allDeviceIds = control->deviceIds();
             mtwDeviceIds.clear();
@@ -334,7 +330,9 @@ class ThreadXsensRead: public ThreadType{
                 if (i == 1)
                     cout << "IMU Usuario Canela: " << imu_id << "\n";
                 if (i == 2)
-                    cout << "IMU Exo: " << imu_id << "\n";
+                    cout << "IMU Usuario pe: " << imu_id << "\n";
+                if (i == 3)
+                    cout << "IMU Canela Exo: " << imu_id << "\n";
             }
 
             eulerData = std::vector<XsEuler>(mtwCallbacks.size());
@@ -342,6 +340,11 @@ class ThreadXsensRead: public ThreadType{
             gyroData = std::vector<XsVector>(mtwCallbacks.size());
             magData = std::vector<XsVector>(mtwCallbacks.size());
 
+            if (!wirelessMasterDevice->gotoMeasurement()) {
+                ostringstream error;
+                error << "Failed to goto measurement mode: " << *wirelessMasterDevice;
+                throw runtime_error(error.str());
+            }
         }
 
         void _loop(){
@@ -389,12 +392,12 @@ class ThreadXsensRead: public ThreadType{
 
                     }
                     if (i == 2) { // Pe
-                        imus_vals[12] = imu_filters[12].apply( gyroVector[1]);
-                        imus_vals[13] = imu_filters[13].apply(-gyroVector[0]);
-                        imus_vals[14] = imu_filters[14].apply( gyroVector[2]);
+                        imus_vals[12] = imu_filters[12].apply(gyroVector[1]);
+                        imus_vals[13] = imu_filters[13].apply(gyroVector[2]);
+                        imus_vals[14] = imu_filters[14].apply(gyroVector[0]);
                         imus_vals[15] = imu_filters[15].apply( accVector[1] );
-                        imus_vals[16] = imu_filters[16].apply(-accVector[0] );
-                        imus_vals[17] = imu_filters[17].apply( accVector[2] );
+                        imus_vals[16] = imu_filters[16].apply( accVector[2] );
+                        imus_vals[17] = imu_filters[17].apply( accVector[0] );
 
                     }
                     if (i == 3) { // Canela Exo
@@ -411,11 +414,12 @@ class ThreadXsensRead: public ThreadType{
                 }
             }
 
+            _datalog[time_index][0] = timer->get_current_time_f();
             for (int idx = 0; idx < N_IMU * 6; idx++) {
                 _datalog[time_index][idx + 1] = data.imus_data[idx];
             }
 
-            if (true) {
+            if (false) {
                 {
                     std::unique_lock<std::mutex> _(_mtx);
                     pw.items[0].data.push_back(ImVec2((float)_datalog[time_index][0], (float)_datalog[time_index][6 * 0 + 1]));

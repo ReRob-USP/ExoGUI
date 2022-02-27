@@ -20,6 +20,7 @@
 
 
 #include <utils_control.hpp>
+#include <LowPassFilter2p.h>
 
 typedef union{
     struct{
@@ -61,6 +62,13 @@ class ThreadMarkovMao1: public ThreadType{
                 std::thread _threadAux;
                 AXIS* axis_m_ptr;
                 AXIS* axis_l_ptr;
+
+                enum {
+                    FILTER_D_OMEGA_L,
+                    FILTER_D_TORQUE_I,
+                };
+
+                LowPassFilter2pFloat filters[2];
 
                 Joint_EXO(){
 
@@ -292,6 +300,10 @@ class ThreadMarkovMao1: public ThreadType{
 
                     u.zeros(1,1);
                     X.zeros(1,1);
+                    for (int i = 0; i < sizeof(filters) / sizeof(LowPassFilter2pFloat); i++) {
+                        filters[i].set_cutoff_frequency(1/Ts, 10);
+                        filters[i].reset();
+                    }
                 }
 
 
@@ -344,14 +356,19 @@ class ThreadMarkovMao1: public ThreadType{
                 void calculate_PID_signal_controle(){
                     u(0,0) = u_ant + kp * (erro_0 - erro_1) + ki * Ts * erro_0 + (kd / Ts) * (erro_0 - 2 * erro_1 + erro_2);
                     omega_m = arma::as_scalar(u);
-                    if (omega_m >= VEL_MAX){omega_m = VEL_MAX;}
-                    else if (omega_m <= -VEL_MAX){omega_m = -VEL_MAX;}
-                    omega_l = arma::as_scalar((u(0,0) / N) - (dot_torque[0] / ks));
-                    u(0,0) = omega_m;
+
+                }
+
+                void calculate_torque_d_PID() {
+                    torque_d = Kv * (theta_ld - theta_l) + Bv * (omega_ld - omega_l);
+
+                    torque_r[0] = ks * (theta_c - theta_l);
+                    erro_0 = (torque_d - torque_r[0]);
                 }
 
                 void calculate_torque_d_loop_externo(int gait_phase) {
-                    torque_d = -Kv*X(2,0) -Bv*d_torque_i; (Kh(0, gait_phase - 1) * X(5, 0) + Jr(0, 0) * d_omega_l);
+                    //torque_d = 0; -Kv * X(2, 0) - Bv * d_torque_i; (Kh(0, gait_phase - 1) * X(5, 0) + Jr(0, 0) * d_omega_l);
+                    torque_d = -Kv * X(2, 0) - Bv * d_torque_i;
                 }
 
                 void calculate_Markov_signal_controle(int gait_phase){
@@ -380,7 +397,7 @@ class ThreadMarkovMao1: public ThreadType{
 
                     error_theta_l[3] = error_theta_l[2];
                     error_theta_l[2] = error_theta_l[1];
-                    error_theta_l[0] = error_theta_l[0];
+                    error_theta_l[1] = error_theta_l[0];
 
                     _theta_l[3] = _theta_l[2];
                     _theta_l[2] = _theta_l[1];
@@ -394,6 +411,7 @@ class ThreadMarkovMao1: public ThreadType{
 
                     _omega_l[0] = omega_l;
                      d_omega_l = (_omega_l[0] - _omega_l[2]) / (2.0 * Ts);
+                     d_omega_l = filters[FILTER_D_OMEGA_L].apply(d_omega_l);
 
                     _omega_l[3] = _omega_l[2];
                     _omega_l[2] = _omega_l[1];
@@ -401,6 +419,7 @@ class ThreadMarkovMao1: public ThreadType{
 
                     _torque_i[0] = X(2, 0);
                     d_torque_i = (_torque_i[0] - _torque_i[2]) / (2.0 * Ts);
+                    d_torque_i = filters[FILTER_D_TORQUE_I].apply(d_torque_i);
 
                     _torque_i[3] = _torque_i[2];
                     _torque_i[2] = _torque_i[1];
@@ -417,6 +436,7 @@ class ThreadMarkovMao1: public ThreadType{
         };
 
         Joint_EXO * knee_r;
+        Joint_EXO * knee_l;
         
 
     public:       
@@ -434,6 +454,10 @@ class ThreadMarkovMao1: public ThreadType{
             knee_r->dir__ = "Mat2Exo/out/";
             knee_r->axis_m_ptr = &((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->servo_knee_right;
             knee_r->axis_l_ptr = &((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->encoder_knee_right;
+
+            knee_l = new Joint_EXO();
+            knee_l->axis_m_ptr = &((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->servo_knee_left;
+            knee_l->axis_l_ptr = &((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->encoder_knee_left;
 
             pw.push_back(PlotWindow("Units [ Nm/s ]", "Time [ s ]", "State 1"));
             pw.push_back(PlotWindow("Units [ Nm ]", "Time [ s ]", "State 2"));
@@ -477,7 +501,7 @@ class ThreadMarkovMao1: public ThreadType{
             if(!knee_r->loadLoopExterno()) throw "Error en lectura loop externo";
             knee_r->reset();
             knee_r->Kv = 1;
-            knee_r->Bv = 0;
+            knee_r->Bv = .1;
             knee_r->kp = 380;
             knee_r->ki = 35;
             knee_r->kd = 3;
@@ -486,10 +510,27 @@ class ThreadMarkovMao1: public ThreadType{
             knee_r->Ts = _Ts;
             knee_r->encoder_in_Q = 4096;
             knee_r->encoder_out_Q = 2048;
-            knee_r->VEL_MAX = 1500;
-            knee_r->X.zeros(8,1);
-            knee_r->u.zeros(1,1);
+            knee_r->VEL_MAX = 2500;
+            knee_r->X.zeros(8, 1);
+            knee_r->u.zeros(1, 1);
             knee_r->omega_m = 0;
+
+            knee_l->reset();
+            knee_l->Kv = 0;
+            knee_l->Bv = 0;
+            knee_l->kp = 200;
+            knee_l->ki = 4;
+            knee_l->kd = 0;
+            knee_l->N = 150;
+            knee_l->ks = 300;
+            knee_l->Ts = _Ts;
+            knee_l->encoder_in_Q = 4096;
+            knee_l->encoder_out_Q = 2048;
+            knee_l->VEL_MAX = 1000;
+            knee_l->omega_m = 0;
+            knee_l->u.zeros(1, 1);
+            knee_l->X.zeros(8, 1);
+
 
             /*((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->reset_falhas();
             ((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->setVelocityMode(knee_r->axis_m_ptr);
@@ -537,21 +578,41 @@ class ThreadMarkovMao1: public ThreadType{
         
         void _firstLoop() {
             ((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->setVelocityMode(knee_r->axis_m_ptr);
+            ((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->setVelocityMode(knee_l->axis_m_ptr);
             ((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->Habilita_Eixo(2);
             knee_r->setOrigin();
+            knee_l->setOrigin();
         }
+
+
+        
 
         void _loop(){
 
+            knee_l->updatePosEncoder();
+
+            knee_l->calculate_torque_d_PID();
+            knee_l->calculate_PID_signal_controle();
+            //knee_l->setVelocity();
+            knee_l->prepareNewLoop();
+
+
+
             ATIMX1->getData(&dataATI);
             XSENSLeo->getData(&dataXsensLeo);
-            int gait_phase = 1;
-
             knee_r->updatePosEncoder();
 
-            //knee_r->calculate_torque_d();
-            knee_r->calculate_torque_d_loop_externo(gait_phase);
+            int gait_phase = 1;
 
+            
+
+            
+
+            if (time_index < (2 * _Ts)) knee_r->torque_d = 0;
+            else {
+                knee_r->calculate_torque_d_loop_externo(gait_phase);
+            }
+            
 
             knee_r->prepareMarkovStates();
             
@@ -565,16 +626,19 @@ class ThreadMarkovMao1: public ThreadType{
             knee_r->X(2,0) = -dataATI.Fx * .25;
             knee_r->X(3,0) = knee_r->omega_l; 
             knee_r->X(4,0) = knee_r->theta_l; 
-            knee_r->X(5,0) = dataXsensLeo.data[3];
+            knee_r->X(5,0) = dataXsensLeo.data[1];
             knee_r->X(6,0) = dataXsensLeo.data[0];
             knee_r->X(7,0) = knee_r->int_torque_error[0]; 
 
             knee_r->calculate_Markov_signal_controle(gait_phase);
-                        
             
-            knee_r->setVelocity();
 
+            
+            //knee_r->setVelocity();
+
+            
             knee_r->prepareNewLoop();
+            
 
             _mtx.lock();   
                 _datalog[time_index][0] = timer->get_delta_time();
@@ -591,12 +655,24 @@ class ThreadMarkovMao1: public ThreadType{
                 _datalog[time_index][11] = knee_r->torque_d;
                 _datalog[time_index][12] = knee_r->theta_ld;
                 _datalog[time_index][13] = knee_r->d_omega_l;
+                _datalog[time_index][14] = gait_phase;
+                _datalog[time_index][15] = knee_l->theta_m;
+                _datalog[time_index][16] = knee_l->theta_l;
+                _datalog[time_index][17] = knee_l->omega_m;
+                _datalog[time_index][18] = knee_l->torque_r[0];
+                _datalog[time_index][19] = knee_l->torque_d;
+                
 
                 for (int idx = 0; idx < pw.size(); idx++) {
                     pw[idx].items[0].data.push_back(ImVec2((float)_datalog[time_index][1], (float)_datalog[time_index][2+idx]));
                 }
 
+                pw[0].items[0].data.push_back(ImVec2(timer->get_current_time_f(), knee_l->theta_m));
+                pw[1].items[0].data.push_back(ImVec2(timer->get_current_time_f(), knee_l->theta_l));
+
             _mtx.unlock();
+
+            
         }
 
         

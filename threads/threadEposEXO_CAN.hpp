@@ -46,14 +46,16 @@ class ThreadEposEXO_CAN: public ThreadType{
         char* NET_ID_SENSOR_01 = (char*)"2";
         char* NET_ID_SERVO_02 = (char *)"3";
         char* NET_ID_SERVO_03 = (char *)"4";
-        char* NET_ID_SERVO_04 = (char *)"5";
+        char* NET_ID_SERVO_04 = (char*)"5";
+        char* NET_ID_SENSOR_06 = (char *)"6";
 
         EPOS_NETWORK epos;
 
         AXIS servo_hip_right    ;
         AXIS servo_hip_left     ;
         AXIS servo_knee_right   ;
-        AXIS encoder_knee_right ;
+        AXIS encoder_knee_right;
+        AXIS encoder_knee_left ;
         AXIS servo_knee_left    ;
         
         int ZERO_SENSOR_KNEE_right = 0;
@@ -77,11 +79,14 @@ class ThreadEposEXO_CAN: public ThreadType{
             epos.StartPDOS(3);
             epos.StartPDOS(4);
             epos.StartPDOS(5);
+            epos.StartPDOS(6);
             epos.StartPDOS(1);
             epos.StartPDOS(2);
             epos.StartPDOS(3);
             epos.StartPDOS(4);
             epos.StartPDOS(5);
+            epos.StartPDOS(6);
+
 
         }
 
@@ -101,6 +106,8 @@ class ThreadEposEXO_CAN: public ThreadType{
 
                 //        encoder_knee_left.ReadPDO01();
                 servo_knee_left.ReadPDO01();
+                encoder_knee_left.ReadPDO01();
+
 
                 servo_hip_right.ReadPDO01();
                 servo_hip_left.ReadPDO01();
@@ -387,6 +394,17 @@ class ThreadEposEXO_CAN: public ThreadType{
 
             esperar_n_seg(1);
 
+            encoder_knee_left.PDOsetControlWord_FaultReset(true);
+            encoder_knee_left.WritePDO01();
+
+            printf("\nResetando as falhas.");
+
+            esperar_n_seg(1);
+
+            printf("..");
+
+
+
             printf("OK");
             _running_aux = false;
         }
@@ -419,6 +437,12 @@ class ThreadEposEXO_CAN: public ThreadType{
             servo_knee_left.ReadPDO01();
             ZERO_SERVO_KNEE_left = servo_knee_left.PDOgetActualPosition();
 
+            encoder_knee_left.ReadPDO01();
+            ZERO_SENSOR_KNEE_left = -encoder_knee_left.PDOgetActualPosition();
+
+            std::cout << "\ZERO_SENSOR_KNEE_right : " << ZERO_SENSOR_KNEE_right;
+            std::cout << "\nZERO_SENSOR_KNEE_left : " << ZERO_SENSOR_KNEE_left;
+
             _running_aux = false;
         }
 
@@ -443,6 +467,8 @@ class ThreadEposEXO_CAN: public ThreadType{
                 servo_knee_right = AXIS(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_01);
                 encoder_knee_right = AXIS(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SENSOR_01);
                 servo_knee_left = AXIS(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SERVO_02);
+                encoder_knee_left = AXIS(CAN_INTERFACE, CAN_DATABASE, CAN_CLUSTER, NET_ID_SENSOR_06);
+                encoder_knee_left.setEposType(4);
 
                 start_transmissao_rede_epos();
                                 

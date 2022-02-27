@@ -19,3 +19,10 @@ figure(3)
 hold on
 plot(t,data(:,12))
 plot(t,data(:,2+2))
+%%
+data = load('../datos/last_data_MarkovMao 1.dat');
+t = data(:,2);
+for i = 16:20
+    subplot(5,1,i-15)
+    plot(t,data(:,i))
+end

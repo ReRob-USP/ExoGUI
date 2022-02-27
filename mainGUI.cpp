@@ -22,10 +22,10 @@ ThreadExo * MarkovMao1;
 
 int mainGUI(){
     ATIMX1 = new ThreadExo(new ThreadATIMX(),"ATIMX 1",1/200.0f,7);
-    XsensRead = new ThreadExo(new ThreadXsensRead(),"XSens Read 1",1/75.0f,25);
+    XsensRead = new ThreadExo(new ThreadXsensRead(),"XSens Read 1",1/100.0f,25);
     EposEXO1 = new ThreadExo(new ThreadEposEXO(),"EposEXO 1",1/200.0f,4);
-    EposEXOCAN1 = new ThreadExo(new ThreadEposEXO_CAN(),"EposEXO CAN 1",1/200.0f,4);
-    MarkovMao1 = new ThreadExo(new ThreadMarkovMao1(),"MarkovMao 1",1/200.0f,14);
+    EposEXOCAN1 = new ThreadExo(new ThreadEposEXO_CAN(),"EposEXO CAN 1",1/400.0f,4);
+    MarkovMao1 = new ThreadExo(new ThreadMarkovMao1(),"MarkovMao 1",1/200.0f,20);
     XSENSLeo = new ThreadExo(new ThreadXsensLeo(),"XSens Leo 1",1/75.0f,11);
     return 0;
 }
