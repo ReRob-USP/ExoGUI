@@ -392,10 +392,10 @@ class ThreadEposEXO_CAN: public ThreadType{
             printf("..");
 
 
-            esperar_n_seg(1);
+           /* esperar_n_seg(1);
 
             encoder_knee_left.PDOsetControlWord_FaultReset(true);
-            encoder_knee_left.WritePDO01();
+            encoder_knee_left.WritePDO01();*/
 
             printf("\nResetando as falhas.");
 
@@ -484,7 +484,7 @@ class ThreadEposEXO_CAN: public ThreadType{
             initAllComunications();
             reset_falhas();
             define_origen();
-
+            epos.sync();
         }
 
         void _cleanup(){

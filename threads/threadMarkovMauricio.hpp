@@ -292,7 +292,7 @@ class ThreadMarkovMao1: public ThreadType{
                     dot_torque[0] = { 0 }; torque_r[0] = { 0 }; dot_torque[2] = { 0 }; torque_r[0] = { 0 }; error_theta[0] = { 0 }; _theta_l[0] = { 0 };
                     error_omega[0] = {0};int_torque_error[0] = {0};error_torque[3] = {0};kp  = 0;ki  = 0;kd  = 0;encoder_in_Q = 0;
                     encoder_out_Q = 0; N = 0; ks = 0; erro_0 = 0, erro_1 = 0, erro_2 = 0; u_ant = 0; Ts = 0; omega_m = 0; error_theta_l[0] = 0;
-                    VEL_MAX = 500; 
+                    VEL_MAX = 500; ZERO_M = 0; ZERO_L = 0;
 
                     /*
                         Falta resetear Vectores
@@ -321,18 +321,26 @@ class ThreadMarkovMao1: public ThreadType{
                     updatePosEncoder();
                     ZERO_M = theta_m;
                     ZERO_L = theta_l;
+                    std::cout << "\n\n Fron MAarkov : ZERO_M : " << ZERO_M << "     ZERO_L :   " << ZERO_L << "\n\n";
                 }
 
                 void setPosEncoder_m(long raw_angle){
-                    raw_angle -= ZERO_M;
+                    //raw_angle -= ZERO_M;
                     theta_c = ( raw_angle * 2.0 * arma::datum::pi) / (encoder_in_Q * N);
                     theta_m = ( raw_angle * 2.0 * arma::datum::pi) / (encoder_in_Q );
+
+                    theta_c -= ZERO_M;
+                    theta_m -= ZERO_M;
+
                 }
 
                 void setPosEncoder_l(long raw_angle){
-                    raw_angle -= ZERO_L;
+                    //raw_angle -= ZERO_L;
                     theta_l = ( - raw_angle * 2.0 * arma::datum::pi) / (encoder_out_Q );
+                    theta_l -= ZERO_L;
+
                     _theta_l[0] = theta_l;
+                    
                 }
 
                 void calculate_torque_d(){
@@ -525,7 +533,7 @@ class ThreadMarkovMao1: public ThreadType{
             knee_l->ks = 300;
             knee_l->Ts = _Ts;
             knee_l->encoder_in_Q = 4096;
-            knee_l->encoder_out_Q = 2048;
+            knee_l->encoder_out_Q = 1024;
             knee_l->VEL_MAX = 1000;
             knee_l->omega_m = 0;
             knee_l->u.zeros(1, 1);
@@ -577,11 +585,12 @@ class ThreadMarkovMao1: public ThreadType{
         }
         
         void _firstLoop() {
+            knee_r->setOrigin();
+            knee_l->setOrigin();
             ((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->setVelocityMode(knee_r->axis_m_ptr);
             ((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->setVelocityMode(knee_l->axis_m_ptr);
             ((ThreadEposEXO_CAN*)EposEXOCAN1->threadType_)->Habilita_Eixo(2);
-            knee_r->setOrigin();
-            knee_l->setOrigin();
+            
         }
 
 
@@ -593,7 +602,7 @@ class ThreadMarkovMao1: public ThreadType{
 
             knee_l->calculate_torque_d_PID();
             knee_l->calculate_PID_signal_controle();
-            //knee_l->setVelocity();
+            knee_l->setVelocity();
             knee_l->prepareNewLoop();
 
 
@@ -611,6 +620,7 @@ class ThreadMarkovMao1: public ThreadType{
             if (time_index < (2 * _Ts)) knee_r->torque_d = 0;
             else {
                 knee_r->calculate_torque_d_loop_externo(gait_phase);
+   
             }
             
 

@@ -419,7 +419,7 @@ class ThreadXsensRead: public ThreadType{
                 _datalog[time_index][idx + 1] = data.imus_data[idx];
             }
 
-            if (false) {
+            if (true) {
                 {
                     std::unique_lock<std::mutex> _(_mtx);
                     pw.items[0].data.push_back(ImVec2((float)_datalog[time_index][0], (float)_datalog[time_index][6 * 0 + 1]));
