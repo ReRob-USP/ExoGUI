@@ -12,6 +12,7 @@ ThreadExo * EposEXO1;
 ThreadExo * EposEXOCAN1;
 ThreadExo * MarkovMao1;
 ThreadExo * XsensGaitPhase1;
+ThreadExo * EXOSquatDavid1;
 
 #include "threads/threadATIMX.hpp"
 #include "threads/threadXsensRead.hpp"
@@ -24,6 +25,8 @@ ThreadExo * XsensGaitPhase1;
 
 #include "threads/threadMarkovMauricio.hpp"
 
+#include "threads/threadEXOSquatDavid.hpp"
+
 
 int mainGUI(){
     ATIMX1 = new ThreadExo(new ThreadATIMX(),"ATIMX 1",1/200.0f,7);
@@ -33,6 +36,8 @@ int mainGUI(){
     MarkovMao1 = new ThreadExo(new ThreadMarkovMao1(),"MarkovMao 1",1/200.0f,20);
     XSENSLeo = new ThreadExo(new ThreadXsensLeo(), "XSens Leo 1", 1 / 75.0f, 11); 
     XsensGaitPhase1 = new ThreadExo(new ThreadXsensGaitPhase(), "XSens  Gait Phase 1", 1 / 100.0f, 4);
+    EXOSquatDavid1 = new ThreadExo(new ThreadEXOSquatDavid(), "EXO Squat David", 1 / 200.0f, 4);
+
     return 0;
 }
 
