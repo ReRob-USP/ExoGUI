@@ -331,15 +331,15 @@ public:
 		// Remove arbitrary IMU attitude:
 		if (float(offCount * _Ts) < 2) // 2 segundos
 		{
-			q12Off.w() += (_Ts / 1) * qDelta(qASGD2_qk, qASGD1_qk)(0);
-			q12Off.x() += (_Ts / 1) * qDelta(qASGD2_qk, qASGD1_qk)(1);
-			q12Off.y() += (_Ts / 1) * qDelta(qASGD2_qk, qASGD1_qk)(2);
-			q12Off.z() += (_Ts / 1) * qDelta(qASGD2_qk, qASGD1_qk)(3);
+			q12Off.w() += (_Ts / 2) * qDelta(qASGD2_qk, qASGD1_qk)(0);
+			q12Off.x() += (_Ts / 2) * qDelta(qASGD2_qk, qASGD1_qk)(1);
+			q12Off.y() += (_Ts / 2) * qDelta(qASGD2_qk, qASGD1_qk)(2);
+			q12Off.z() += (_Ts / 2) * qDelta(qASGD2_qk, qASGD1_qk)(3);
 
-			q23Off.w() += (_Ts / 1) * qDelta(qASGD3_qk, qASGD2_qk)(0);
-			q23Off.x() += (_Ts / 1) * qDelta(qASGD3_qk, qASGD2_qk)(1);
-			q23Off.y() += (_Ts / 1) * qDelta(qASGD3_qk, qASGD2_qk)(2);
-			q23Off.z() += (_Ts / 1) * qDelta(qASGD3_qk, qASGD2_qk)(3);
+			q23Off.w() += (_Ts / 2) * qDelta(qASGD3_qk, qASGD2_qk)(0);
+			q23Off.x() += (_Ts / 2) * qDelta(qASGD3_qk, qASGD2_qk)(1);
+			q23Off.y() += (_Ts / 2) * qDelta(qASGD3_qk, qASGD2_qk)(2);
+			q23Off.z() += (_Ts / 2) * qDelta(qASGD3_qk, qASGD2_qk)(3);
 			offCount++;
 		}
 		else
